@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -20,7 +21,8 @@ class _DockState extends State<Dock> {
   late final List<DockTileModal> tiles;
   int? hoverIndex;
   int? dragIndex;
-  bool isOutsideDock = false;
+  bool isInsideDock = true;
+  Offset? start;
 
   @override
   void initState() {
@@ -65,6 +67,19 @@ class _DockState extends State<Dock> {
     return propertyValue;
   }
 
+  void onDragTimer() {
+    Timer(const Duration(milliseconds: 800), () {
+      if (dragIndex != null && hoverIndex != null && dragIndex != hoverIndex) {
+        setState(() {
+          tiles.insert(hoverIndex!, tiles.removeAt(dragIndex!));
+          dragIndex = hoverIndex;
+          start = null;
+        });
+      }
+      if (dragIndex != null) onDragTimer();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -85,27 +100,22 @@ class _DockState extends State<Dock> {
           mainAxisSize: MainAxisSize.min,
           children: List.generate(tiles.length, (index) {
             return MouseRegion(
-              opaque: false,
               cursor: SystemMouseCursors.click,
               onEnter: ((event) {
-                setState(() {
-                  hoverIndex = index;
-                  isOutsideDock = false;
-                  if (dragIndex != null) {
-                    tiles.insert(hoverIndex!, tiles.removeAt(dragIndex!));
-                    dragIndex = hoverIndex;
-                  }
-                });
+                hoverIndex = index;
+                if (dragIndex == null) {
+                  setState(() {
+                    hoverIndex = index;
+                  });
+                }
               }),
               onExit: (event) {
-                setState(() {
-                  hoverIndex = null;
-                  Future.delayed(const Duration(milliseconds: 500), () {
-                    if (hoverIndex == null) {
-                      setState(() => isOutsideDock = true);
-                    }
+                hoverIndex = null;
+                if (dragIndex == null) {
+                  setState(() {
+                    hoverIndex = null;
                   });
-                });
+                }
               },
               child: AnimatedContainer(
                 duration: animationDuration,
@@ -116,23 +126,35 @@ class _DockState extends State<Dock> {
                     0.0,
                   ),
                 child: LongPressDraggable(
+                    delay: animationDuration,
                     maxSimultaneousDrags: 1,
                     onDragStarted: () {
+                      onDragTimer();
                       setState(() {
                         dragIndex = index;
                       });
                     },
                     onDragEnd: (details) {
+                      start = null;
                       setState(() {
                         dragIndex = null;
                       });
+                    },
+                    onDragUpdate: (details) {
+                      start ??= details.globalPosition;
+                      if (isInsideDock !=
+                          (start! - details.globalPosition).distance < 50) {
+                        setState(() {
+                          isInsideDock = !isInsideDock;
+                        });
+                      }
                     },
                     feedback:
                         DockTile(tile: tiles[index], toDisplayTitle: false),
                     child: dragIndex == index
                         ? AnimatedSize(
                             duration: animationDuration,
-                            child: SizedBox(width: isOutsideDock ? 0 : 48))
+                            child: SizedBox(width: isInsideDock ? 60 : 0))
                         : DockTile(
                             tile: tiles[index],
                             toDisplayTitle:
