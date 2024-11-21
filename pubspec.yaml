@@ -1,5 +1,5 @@
 name: macos_dock_example
-description: "A new Flutter project."
+description: "A Flutter project to implement macos dock."
 publish_to: 'none'
 version: 0.1.0
 
